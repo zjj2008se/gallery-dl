@@ -222,7 +222,7 @@ class DownloadJob(Job):
         instance = self.downloaders.get(scheme)
         if instance is None:
             klass = downloader.find(scheme)
-            instance = klass(self.extractor.session, self.out)
+            instance = klass(self.extractor, self.out)
             self.downloaders[scheme] = instance
         return instance
 

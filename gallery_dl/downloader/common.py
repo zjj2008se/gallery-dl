@@ -20,13 +20,25 @@ class DownloaderBase():
     scheme = ""
     retries = 1
 
-    def __init__(self, session, output):
-        self.session = session
+    def __init__(self, extractor, output):
+        self.session = extractor.session
         self.out = output
         self.log = logging.getLogger("download")
         self.downloading = False
         self.part = self.config("part", True)
         self.partdir = self.config("part-directory")
+
+        classify = extractor.config("classify")
+        if classify:
+            if not isinstance(classify, dict):
+                classify = CLASSIFIER_MAP
+            self.classify = {
+                ext: category
+                for category, exts in classify.items()
+                for ext in exts
+            }
+        else:
+            self.classify = False
 
         if self.partdir:
             self.partdir = util.expand_path(self.partdir)
@@ -130,6 +142,20 @@ class DownloaderBase():
             pathfmt.adjust_extension(adj_ext)
         if self.part:
             pathfmt.part_move()
+
+        if self.classify:
+            directory = self.classify.get(pathfmt.keywords["extension"])
+            if directory:
+                path = os.path.join(pathfmt.realdirectory, directory)
+                try:
+                    os.mkdir(path)
+                except FileExistsError:
+                    pass
+                os.replace(
+                    pathfmt.realpath,
+                    os.path.join(path, pathfmt.filename)
+                )
+
         self.out.success(pathfmt.path, tries)
         return True
 
@@ -169,4 +195,12 @@ FILETYPE_CHECK = {
     "jpg": lambda h: h[0:2] == b"\xff\xd8",
     "png": lambda h: h[0:8] == b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a",
     "gif": lambda h: h[0:4] == b"GIF8" and h[5] == 97,
+}
+
+CLASSIFIER_MAP = {
+    "Music" : ["mp3", "aac", "flac", "ogg", "wma", "m4a", "wav"],
+    "Video" : ["flv", "ogv", "avi", "mp4", "mpg", "mpeg", "3gp", "mkv",
+               "webm", "vob", "wmv"],
+    "Pictures" : ["png", "jpeg", "gif", "jpg", "bmp", "svg", "webp"],
+    "Archives" : ["rar", "zip", "7z", "gz", "bz2", "tar"],
 }
